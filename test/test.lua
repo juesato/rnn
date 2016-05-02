@@ -5008,6 +5008,8 @@ function rnntest.clearState()
       local input = {torch.Tensor(200), torch.Tensor(200), torch.Tensor(200)}
       local t = {torch.Tensor(4), torch.Tensor(4), torch.Tensor(4)}
       local output = seq:forward(input)
+   end
+end
 
 function checkgrad(opfunc, x, eps)
    -- Function taken from 'optim' package to avoid introducing dependency
@@ -5060,7 +5062,7 @@ function rnntest.NormStabilizer()
             for j=1,input:size(1) do
                reg = reg + ((input[j]:norm() - inputTable[i-1][j]:norm())^2)
             end
-            self.output = self.output + 5.0 * reg / input:size(1)
+            self.output = self.output + self.beta * reg / input:size(1)
          end
       end
       return self.output
@@ -5086,7 +5088,7 @@ function rnntest.NormStabilizer()
       :add(nn.NormStabilizer(beta))
    
    rnn = nn.Sequencer(rnn)
-   criterion = nn.SequencerCriterionReg(nn.MSECriterion(), beta)
+   criterion = nn.SequencerCriterionNormStab(nn.MSECriterion(), beta)
 
    local iteration = 1
    params, gradParams = rnn:getParameters()

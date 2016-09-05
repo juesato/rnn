@@ -18,13 +18,13 @@ _operations = {
    --nn.CMaxTable(), -- max -- doesn't deal with batched inputs
    nn.SelectTable(1), -- keep
    nn.SelectTable(2), -- replace
-   nn.CMulTable(), -- mul
+   -- nn.CMulTable(), -- mul
    --nn.CMinTable(), -- min -- doesn't deal with batched inputs
-   nn.CSubTable(), -- diff
-   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
+   -- nn.CSubTable(), -- diff
+   -- nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
    -- SqrtDiffLayer -- sqrt_diff -- nan bug
 }
-NUM_OPS = 5
+NUM_OPS = 2
 
 function MuFuRu:__init(inputSize, outputSize, rho)
    self.num_ops = NUM_OPS

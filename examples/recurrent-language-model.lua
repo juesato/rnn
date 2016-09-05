@@ -33,6 +33,7 @@ cmd:option('--uniform', 0.1, 'initialize parameters using uniform distribution b
 cmd:option('--lstm', false, 'use Long Short Term Memory (nn.LSTM instead of nn.Recurrent)')
 cmd:option('--bn', false, 'use batch normalization. Only supported with --lstm')
 cmd:option('--gru', false, 'use Gated Recurrent Units (nn.GRU instead of nn.Recurrent)')
+cmd:option('--mfru', false, 'use Multi-function Recurrent Unit (nn.MuFuRu instead of nn.Recurrent)')
 cmd:option('--seqlen', 5, 'sequence length : back-propagate through time (BPTT) for this many time-steps')
 cmd:option('--inputsize', -1, 'size of lookup table embeddings. -1 defaults to hiddensize[1]')
 cmd:option('--hiddensize', '{200}', 'number of hidden units used at output of each recurrent layer. When more than one is specified, RNN/LSTMs/GRUs are stacked')
@@ -93,6 +94,8 @@ for i,hiddensize in ipairs(opt.hiddensize) do
       nn.FastLSTM.usenngraph = true -- faster
       nn.FastLSTM.bn = opt.bn
       rnn = nn.FastLSTM(inputsize, hiddensize)
+   elseif opt.mfru then -- Multi Function Recurrent Unit
+      rnn = nn.MuFuRu(inputsize, hiddensize)
    else -- simple recurrent neural network
       local rm =  nn.Sequential() -- input is {x[t], h[t-1]}
          :add(nn.ParallelTable()
@@ -120,7 +123,7 @@ stepmodule:add(nn.LogSoftMax())
 lm:add(nn.Sequencer(stepmodule))
 
 -- remember previous state between batches
-lm:remember((opt.lstm or opt.gru) and 'both' or 'eval')
+lm:remember((opt.lstm or opt.gru or opt.mfru) and 'both' or 'eval')
 
 if not opt.silent then
    print"Language Model:"

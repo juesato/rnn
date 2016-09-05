@@ -18,8 +18,8 @@ torch.include('rnn', 'Module.lua')
 torch.include('rnn', 'Dropout.lua')
 
 -- for testing:
-torch.include('rnn', 'test.lua')
-torch.include('rnn', 'bigtest.lua')
+torch.include('rnn', 'test/test.lua')
+torch.include('rnn', 'test/bigtest.lua')
 
 -- support modules
 torch.include('rnn', 'ZeroGrad.lua')
@@ -36,6 +36,7 @@ torch.include('rnn', 'Recurrent.lua')
 torch.include('rnn', 'LSTM.lua')
 torch.include('rnn', 'FastLSTM.lua')
 torch.include('rnn', 'GRU.lua')
+torch.include('rnn', 'Mufuru.lua')
 torch.include('rnn', 'Recursor.lua')
 torch.include('rnn', 'Recurrence.lua')
 torch.include('rnn', 'NormStabilizer.lua')

@@ -176,6 +176,18 @@ xplog.valppl = {}
 -- will be used for early-stopping
 xplog.minvalppl = 99999999
 xplog.epoch = 0
+xplog.norm_histogram = {0, 0, 0, 0, 0, 0, 0}
+
+function add_norm_obs(norm)
+   CUTOFFS = {0.5, 1.0, 3.0, 10.0, 50.0, 100.0, 1000000.0}
+   for idx=1,#CUTOFFS do
+      if norm <= CUTOFFS[i] then
+         xplog.norm_histogram[idx] = xplog.norm_histogram[idx] + 1
+         break
+      end
+   end
+end
+
 local ntrial = 0
 paths.mkdir(opt.savepath)
 
@@ -206,8 +218,11 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
       lm:backward(inputs, gradOutputs)
       
       -- update
+      -- print ("cutoff", opt.cutoff)
       if opt.cutoff > 0 then
          local norm = lm:gradParamClip(opt.cutoff) -- affects gradParams
+         -- print ("norm", norm)
+         add_norm_obs(norm)
          opt.meanNorm = opt.meanNorm and (opt.meanNorm*0.9 + norm*0.1) or norm
       end
       lm:updateGradParameters(opt.momentum) -- affects gradParams

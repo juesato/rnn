@@ -179,7 +179,7 @@ xplog.minvalppl = 99999999
 xplog.epoch = 0
 xplog.norm_histogram = {0, 0, 0, 0, 0, 0, 0}
 
-function add_norm_obs(norm)
+local function add_norm_obs(norm)
    CUTOFFS = {0.5, 1.0, 3.0, 10.0, 50.0, 100.0, 1000000.0}
    for idx=1,#CUTOFFS do
       if norm <= CUTOFFS[idx] then
@@ -189,49 +189,11 @@ function add_norm_obs(norm)
    end
 end
 
--- global variables
-params, grad_params = lm:getParameters()
-sumErr = 0
-curInputs = nil
-curTargets = nil
-adam_config = {
+local params, grad_params = lm:getParameters()
+local adam_config = {
    beta1 = 0.0,
    beta2 = 0.999  
 }
-
-function feval(x) -- what's going on with feval http://rnduja.github.io/2015/10/26/deep_learning_with_torch_step_7_optim/
-   if x ~= params then
-      params:copy(x)
-      print ("this shouldn't happen")
-   end
-   grad_params:zero()
-
-   -- forward
-   local outputs = lm:forward(curInputs)
-   local err = criterion:forward(outputs, curTargets)
-   sumErr = sumErr + err
-   if (err > 100000) then
-      print ("LARGE ERR", err)
-      print ("INPUTS", curInputs)
-      print ("OUTPUTS", outputs)
-      print ("TARGETS", curTargets)
-   end
-     
-   -- backward 
-   local gradOutputs = criterion:backward(outputs, curTargets)
-   lm:zeroGradParameters()
-   lm:backward(curInputs, gradOutputs)
-
-   -- gradient clipping
-   if opt.cutoff > 0 then
-      local norm = lm:gradParamClip(opt.cutoff) -- affects gradParams
-      -- print ("norm", norm)
-      add_norm_obs(norm)
-      opt.meanNorm = opt.meanNorm and (opt.meanNorm*0.9 + norm*0.1) or norm
-   end
-
-   return err, grad_params
-end
 
 local ntrial = 0
 paths.mkdir(opt.savepath)
@@ -248,35 +210,39 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
    
    local a = torch.Timer()
    lm:training()
-   sumErr = 0
+   local sumErr = 0
    -- local sumErr = 0
    for i, inputs, targets in trainset:subiter(opt.seqlen, opt.trainsize) do
-      curTargets = targetmodule:forward(targets)
-      curInputs = inputs
-      -- -- forward
-      -- local outputs = lm:forward(inputs)
-      -- local err = criterion:forward(outputs, targets)
-      -- sumErr = sumErr + err
-      
-      -- -- backward 
-      -- local gradOutputs = criterion:backward(outputs, targets)
-      -- lm:zeroGradParameters()
-      -- lm:backward(inputs, gradOutputs)
-      
-      -- update
-      -- print ("cutoff", opt.cutoff)
+      local curTargets = targetmodule:forward(targets)
+      local curInputs = inputs
+
+      local function feval(x)
+         if x ~= params then
+            params:copy(x)
+         end
+         grad_params:zero()
+
+         -- forward
+         local outputs = lm:forward(curInputs)
+         local err = criterion:forward(outputs, curTargets)
+         sumErr = sumErr + err
+
+         -- backward 
+         local gradOutputs = criterion:backward(outputs, curTargets)
+         lm:zeroGradParameters()
+         lm:backward(curInputs, gradOutputs)
+
+         -- gradient clipping
+         if opt.cutoff > 0 then
+            local norm = lm:gradParamClip(opt.cutoff) -- affects gradParams
+            add_norm_obs(norm)
+            opt.meanNorm = opt.meanNorm and (opt.meanNorm*0.9 + norm*0.1) or norm
+         end
+
+         return err, grad_params
+      end
+
       local _, loss = optim.adam(feval, params, adam_config)
-
-      -- if opt.cutoff > 0 then
-      --    local norm = lm:gradParamClip(opt.cutoff) -- affects gradParams
-      --    print ("norm", norm)
-      --    add_norm_obs(norm)
-      --    opt.meanNorm = opt.meanNorm and (opt.meanNorm*0.9 + norm*0.1) or norm
-      -- end
-
-      -- lm:updateGradParameters(opt.momentum) -- affects gradParams
-      -- lm:updateParameters() -- affects params
-      -- lm:maxParamNorm(opt.maxnormout) -- affects params
 
       if opt.progress then
          xlua.progress(math.min(i + opt.seqlen, opt.trainsize), opt.trainsize)

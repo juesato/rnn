@@ -15,14 +15,14 @@ local SqrtDiffLayer = nn.Sequential()
 
 -- all operations take a table {oldState, newState} and return newState
 _operations = {
-   --nn.CMaxTable(), -- max -- doesn't deal with batched inputs
+   nn.CMaxTable(), -- max
    nn.SelectTable(1), -- keep
    nn.SelectTable(2), -- replace
-   -- nn.CMulTable(), -- mul
-   --nn.CMinTable(), -- min -- doesn't deal with batched inputs
-   -- nn.CSubTable(), -- diff
-   -- nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
-   -- SqrtDiffLayer -- sqrt_diff -- nan bug
+   nn.CMulTable(), -- mul
+   nn.CMinTable(), -- min
+   nn.CSubTable(), -- diff
+   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
+   SqrtDiffLayer -- sqrt_diff
 }
 NUM_OPS = 2
 

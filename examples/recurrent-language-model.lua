@@ -194,6 +194,7 @@ local adam_config = {
    beta1 = 0.0,
    beta2 = 0.999  
 }
+print ("PARAMS", params:size())
 
 local ntrial = 0
 paths.mkdir(opt.savepath)
@@ -215,7 +216,6 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
    for i, inputs, targets in trainset:subiter(opt.seqlen, opt.trainsize) do
       local curTargets = targetmodule:forward(targets)
       local curInputs = inputs
-
       local function feval(x)
          if x ~= params then
             params:copy(x)
@@ -254,14 +254,15 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
 
    end
    
-   -- learning rate decay
-   if opt.schedule then
-      opt.lr = opt.schedule[epoch] or opt.lr
-   else
-      opt.lr = opt.lr + (opt.minlr - opt.startlr)/opt.saturate
-   end
-   opt.lr = math.max(opt.minlr, opt.lr)
+   -- -- learning rate decay
+   -- if opt.schedule then
+   --    opt.lr = opt.schedule[epoch] or opt.lr
+   -- else
+   --    opt.lr = opt.lr + (opt.minlr - opt.startlr)/opt.saturate
+   -- end
+   -- opt.lr = math.max(opt.minlr, opt.lr)
    
+   print ("please print")
    if not opt.silent then
       print("learning rate", opt.lr)
       if opt.meanNorm then

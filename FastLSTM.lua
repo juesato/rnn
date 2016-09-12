@@ -115,6 +115,9 @@ function FastLSTM:nngraphModel()
       -- add bias after BN as per paper
       self.o2g:noBias()
       h2h = nn.Add(4*self.outputSize)(h2h)
+   elseif self.ln then
+      -- We could potentially use Layer Normalization on the gates before sigmoid, but we don't yet      
+      ln_c = nn.LayerNormalization(self.outputSize) -- use default values
    else
       -- evaluate the input sums at once for efficiency
       i2h = self.i2g(x):annotate{name='i2h'}
@@ -139,6 +142,11 @@ function FastLSTM:nngraphModel()
    if self.bn then
       -- gated cells form the output
       next_h = nn.CMulTable()({out_gate, nn.Tanh()(bn_c(next_c):annotate {name = 'bn_c'}) })
+   elseif self.ln then
+      next_h = nn.CMulTable()({
+         out_gate, 
+         nn.Tanh()(ln_c(next_c):annotate{name = 'ln_c'})
+      })
    else
       -- gated cells form the output
       next_h = nn.CMulTable()({out_gate, nn.Tanh()(next_c)})

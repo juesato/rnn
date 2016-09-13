@@ -117,7 +117,12 @@ function FastLSTM:nngraphModel()
       h2h = nn.Add(4*self.outputSize)(h2h)
    elseif self.ln then
       -- We could potentially use Layer Normalization on the gates before sigmoid, but we don't yet      
+      ln_wh = nn.LayerNormalization(4*self.outputSize)
+      ln_wx = nn.LayerNormalization(4*self.outputSize)
       ln_c = nn.LayerNormalization(self.outputSize) -- use default values
+
+      i2h = ln_wx(self.i2g(x):annotate{name='i2h'}):annotate {name='ln_wx'}
+      h2h = ln_wh(self.o2g(prev_h):annotate{name='h2h'}):annotate {name = 'ln_wh'}
    else
       -- evaluate the input sums at once for efficiency
       i2h = self.i2g(x):annotate{name='i2h'}

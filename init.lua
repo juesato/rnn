@@ -40,6 +40,8 @@ torch.include('rnn', 'Recursor.lua')
 torch.include('rnn', 'Recurrence.lua')
 torch.include('rnn', 'NormStabilizer.lua')
 
+torch.include('rnn', 'LayerNormalization.lua')
+
 -- sequencer modules
 torch.include('rnn', 'AbstractSequencer.lua')
 torch.include('rnn', 'Repeater.lua')

@@ -17,11 +17,11 @@ local SqrtDiffLayer = nn.Sequential()
 _operations = {
    -- nn.CMaxTable(), -- max
    nn.SelectTable(1), -- keep
-   nn.SelectTable(2) -- replace
-   -- nn.CMulTable(), -- mul
-   -- nn.CMinTable(), -- min
+   nn.SelectTable(2), -- replace
+   nn.CMulTable(), -- mul
+   nn.CMinTable(), -- min
    -- nn.CSubTable(), -- diff
-   -- nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
+   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)) -- forget
    -- SqrtDiffLayer -- sqrt_diff
 }
 
@@ -105,6 +105,7 @@ function MuFuRu:buildModel()
          :add(nn.SelectTable(3))
          :add(debug)
       )
+      -- :add(nn.PrintSize(), "Before Mixture")
       :add(nn.MixtureTable())
 
    local cell = nn.Sequential()

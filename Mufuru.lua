@@ -15,19 +15,18 @@ local SqrtDiffLayer = nn.Sequential()
 
 -- all operations take a table {oldState, newState} and return newState
 _operations = {
-   nn.CMaxTable(), -- max
+   -- nn.CMaxTable(), -- max
    nn.SelectTable(1), -- keep
-   nn.SelectTable(2), -- replace
-   nn.CMulTable(), -- mul
-   nn.CMinTable(), -- min
-   nn.CSubTable(), -- diff
-   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
-   SqrtDiffLayer -- sqrt_diff
+   nn.SelectTable(2) -- replace
+   -- nn.CMulTable(), -- mul
+   -- nn.CMinTable(), -- min
+   -- nn.CSubTable(), -- diff
+   -- nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
+   -- SqrtDiffLayer -- sqrt_diff
 }
-NUM_OPS = 2
 
 function MuFuRu:__init(inputSize, outputSize, rho)
-   self.num_ops = NUM_OPS
+   self.num_ops = #_operations
    self.inputSize = inputSize
    self.outputSize = outputSize
 

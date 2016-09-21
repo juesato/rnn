@@ -10,19 +10,20 @@ local MuFuRu, parent = torch.class('nn.MuFuRu', 'nn.GRU')
 
 local SqrtDiffLayer = nn.Sequential()
                         :add(nn.CSubTable())
+                        :add(nn.Abs())
                         :add(nn.Sqrt())
                         :add(nn.MulConstant(0.25))
 
 -- all operations take a table {oldState, newState} and return newState
 _operations = {
-   -- nn.CMaxTable(), -- max
+   nn.CMaxTable(), -- max
    nn.SelectTable(1), -- keep
    nn.SelectTable(2), -- replace
    nn.CMulTable(), -- mul
    nn.CMinTable(), -- min
-   -- nn.CSubTable(), -- diff
-   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)) -- forget
-   -- SqrtDiffLayer -- sqrt_diff
+   nn.CSubTable(), -- diff
+   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
+   SqrtDiffLayer -- sqrt_diff causes nans
 }
 
 function MuFuRu:__init(inputSize, outputSize, rho)

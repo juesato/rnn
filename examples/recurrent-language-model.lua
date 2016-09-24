@@ -20,6 +20,8 @@ cmd:option('--minlr', 0.00001, 'minimum learning rate')
 cmd:option('--saturate', 400, 'epoch at which linear decayed LR will reach minlr')
 cmd:option('--schedule', '', 'learning rate schedule. e.g. {[5] = 0.004, [6] = 0.001}')
 cmd:option('--momentum', 0.9, 'momentum')
+cmd:option('--adam', false, 'use ADAM instead of SGD as optimizer')
+cmd:option('--adamconfig', '{0, 0.999}', 'ADAM hyperparameters beta1 and beta2')
 cmd:option('--maxnormout', -1, 'max l2-norm of each layer\'s output neuron weights')
 cmd:option('--cutoff', -1, 'max l2-norm of concatenation of all gradParam tensors')
 cmd:option('--batchSize', 32, 'number of examples per batch')
@@ -50,6 +52,7 @@ cmd:text()
 local opt = cmd:parse(arg or {})
 opt.hiddensize = loadstring(" return "..opt.hiddensize)()
 opt.schedule = loadstring(" return "..opt.schedule)()
+opt.adamconfig = loadstring(" return "..opt.adamconfig)()
 opt.inputsize = opt.inputsize == -1 and opt.hiddensize[1] or opt.inputsize
 if not opt.silent then
    table.print(opt)
@@ -168,7 +171,9 @@ xplog.dataset = 'PennTreeBank'
 xplog.vocab = trainset.vocab
 -- will only serialize params
 xplog.model = nn.Serial(lm)
-xplog.model:mediumSerial()
+if not opt.mfru then -- nn.MixtureTable in MFRU incompatible with mediumSerial
+   xplog.model:mediumSerial()
+end
 xplog.criterion = criterion
 xplog.targetmodule = targetmodule
 -- keep a log of NLL for each epoch
@@ -190,11 +195,11 @@ local function add_norm_obs(norm)
 end
 
 local params, grad_params = lm:getParameters()
-local adam_config = {
-   beta1 = 0.0,
-   beta2 = 0.999  
+
+local adamconfig = {
+   beta1 = opt.adamconfig[1],
+   beta2 = opt.adamconfig[2]
 }
-print ("PARAMS", params:size())
 
 local ntrial = 0
 paths.mkdir(opt.savepath)
@@ -208,7 +213,11 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
    print("Epoch #"..epoch.." :")
 
    -- 1. training
-   
+   sgdconfig = {
+      learningRate = opt.lr,
+      momentum = opt.momentum
+   }
+
    local a = torch.Timer()
    lm:training()
    local sumErr = 0
@@ -216,6 +225,7 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
    for i, inputs, targets in trainset:subiter(opt.seqlen, opt.trainsize) do
       local curTargets = targetmodule:forward(targets)
       local curInputs = inputs
+
       local function feval(x)
          if x ~= params then
             params:copy(x)
@@ -235,14 +245,18 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
          -- gradient clipping
          if opt.cutoff > 0 then
             local norm = lm:gradParamClip(opt.cutoff) -- affects gradParams
-            add_norm_obs(norm)
             opt.meanNorm = opt.meanNorm and (opt.meanNorm*0.9 + norm*0.1) or norm
+            add_norm_obs(norm)
          end
 
          return err, grad_params
       end
 
-      local _, loss = optim.adam(feval, params, adam_config)
+      if opt.adam then
+         local _, loss = optim.adam(feval, params, adamconfig)
+      else
+         local _, loss = optim.sgd(feval, params, sgdconfig)
+      end
 
       if opt.progress then
          xlua.progress(math.min(i + opt.seqlen, opt.trainsize), opt.trainsize)
@@ -254,15 +268,14 @@ while opt.maxepoch <= 0 or epoch <= opt.maxepoch do
 
    end
    
-   -- -- learning rate decay
-   -- if opt.schedule then
-   --    opt.lr = opt.schedule[epoch] or opt.lr
-   -- else
-   --    opt.lr = opt.lr + (opt.minlr - opt.startlr)/opt.saturate
-   -- end
-   -- opt.lr = math.max(opt.minlr, opt.lr)
+   -- learning rate decay
+   if opt.schedule then
+      opt.lr = opt.schedule[epoch] or opt.lr
+   else
+      opt.lr = opt.lr + (opt.minlr - opt.startlr)/opt.saturate
+   end
+   opt.lr = math.max(opt.minlr, opt.lr)
    
-   print ("please print")
    if not opt.silent then
       print("learning rate", opt.lr)
       if opt.meanNorm then

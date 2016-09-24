@@ -16,32 +16,27 @@ local SqrtDiffLayer = nn.Sequential()
 
 -- all operations take a table {oldState, newState} and return newState
 _operations = {
-   nn.CMaxTable(), -- max
-   nn.SelectTable(1), -- keep
-   nn.SelectTable(2), -- replace
-   nn.CMulTable(), -- mul
-   nn.CMinTable(), -- min
-   nn.CSubTable(), -- diff
-   nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)), -- forget
-   SqrtDiffLayer -- sqrt_diff causes nans
+   max = nn.CMaxTable(),
+   keep = nn.SelectTable(1),
+   replace = nn.SelectTable(2),
+   mul = nn.CMulTable(),
+   min = nn.CMinTable(),
+   diff = nn.CSubTable(),
+   forget = nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)),
+   sqrt_diff = SqrtDiffLayer
 }
 
-function MuFuRu:__init(inputSize, outputSize, rho)
-   self.num_ops = #_operations
+function MuFuRu:__init(inputSize, outputSize, ops, rho)
+   -- Use all ops by default. To replicate GRU, use keep and replace only.
+   self.ops = ops or {'max', 'keep', 'replace', 'mul', 'min', 'diff', 'forget', 'sqrt_diff'}
+   self.num_ops = #self.ops
+   self.operations = {}
+   for i=1,self.num_ops do
+      self.operations[i] = _operations[self.ops[i]]
+   end
    self.inputSize = inputSize
    self.outputSize = outputSize
-
    parent.__init(self, inputSize, outputSize, rho or 9999)
-
-   -- build the model
-   -- self.recurrentModule = self:buildModel()
-
-   -- make it work with nn.Container
-   -- self.modules[1] = self.recurrentModule
-   -- self.sharedClones[1] = self.recurrentModule
-
-   -- cached for output(0), cell(0) and gradCell(T)
-   -- self.zeroTensor = torch.Tensor() 
 end
 
 -------------------------- factory methods -----------------------------
@@ -68,7 +63,6 @@ function MuFuRu:buildModel()
             :add(nn.CMulTable())
          )
       )
-      -- join along non-batch dimension
       :add(nn.JoinTable(nonBatchDim)) -- [x_t, r dot s_t-1]
       :add(nn.Linear(self.inputSize + self.outputSize, self.outputSize))
       :add(nn.Tanh())
@@ -88,17 +82,13 @@ function MuFuRu:buildModel()
       -- NB: op_weights is an unused argument to feature to avoid the need for an
       -- extra Sequential + Narrow
       all_ops:add(nn.Sequential()
-         :add(_operations[i])
-         -- :add(nn.NaN(nn.PrintSize(), "opsnan"..i))
-         -- :add(nn.PrintSize("after operations "..i))
+         :add(self.operations[i])
       )
    end
 
    local debug = nn.Sequential()
       :add(nn.NarrowTable(1,2))
-      -- :add(nn.NaN(nn.PrintSize(), "printsize3"))
       :add(all_ops)
-      -- :add(nn.NaN(nn.PrintSize(), "printsize2"))
 
    -- combine_ops takes {input, prevOutput, reset} to op weights
    local combine_ops = nn.Sequential()
@@ -106,7 +96,6 @@ function MuFuRu:buildModel()
          :add(nn.SelectTable(3))
          :add(debug)
       )
-      -- :add(nn.PrintSize(), "Before Mixture")
       :add(nn.MixtureTable())
 
    local cell = nn.Sequential()
@@ -127,8 +116,12 @@ end
 -- Factory methods are inherited from GRU
 
 function MuFuRu:__tostring__()
-   return torch.type(self)
-   -- return string.format('%s(%d -> %d)', torch.type(self), self.inputSize, self.outputSize)
+   local op_str = '{ '
+   for i=1,self.num_ops do
+      op_str = op_str .. self.ops[i] .. ' '
+   end
+   op_str = op_str .. '}'
+   return (string.format('%s(%d -> %d) ', torch.type(self), self.inputSize, self.outputSize)) .. op_str
 end
 
 function MuFuRu:migrate(params)

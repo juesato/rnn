@@ -1,5 +1,6 @@
 local AssociativeLSTM, parent = torch.class("nn.AssociativeLSTM", "nn.LSTM")
 
+
 function AssociativeLSTM:__init(inputSize, outputSize, rho)
    require 'nngraph'
    self.inputSize = inputSize
@@ -8,6 +9,26 @@ function AssociativeLSTM:__init(inputSize, outputSize, rho)
    parent.__init(self, self.inputSize, self.outputSize, rho) 
 end
 
+function AssociativeLSTM.makeComplexBounded(real_node, imag_node)
+   -- Implements the hard bounding function bound(h) from Associative LSTM paper
+   -- Restricts the modulus of a complex number to be between 0 and 1
+   local INF = 99999999
+   local element_wise_norm = nn.Sqrt()(
+      nn.CAddTable()({
+         nn.Square()(real_node),
+         nn.Square()(imag_node)
+      })
+   )
+   local bounded_real = nn.CDivTable()({
+      real_node,
+      nn.Clamp(1, INF)(element_wise_norm)
+   })
+   local bounded_imag = nn.CDivTable()({
+      imag_node,
+      nn.Clamp(1, INF)(element_wise_norm)
+   })
+   return bounded_real, bounded_imag
+end
 
 function AssociativeLSTM:buildModel()
    -- input : {input, prevOutput, prevCell}
@@ -35,12 +56,15 @@ function AssociativeLSTM:buildModel()
    local gi = nn.Sigmoid()(n2)
    local go_tmp = nn.Contiguous()(nn.Replicate(2, 2)(nn.Sigmoid()(n3)))
    local go = nn.View(-1):setNumInputDims(2)(go_tmp)
-   local ri_real = nn.Tanh()(n4)
-   local ri_imag = nn.Tanh()(n5)
-   local ro_real = nn.Tanh()(n6)
-   local ro_imag = nn.Tanh()(n7)
-   local u_real  = nn.Tanh()(n8)
-   local u_imag  = nn.Tanh()(n9)
+   -- local ri_real = nn.Tanh()(n4)
+   -- local ri_imag = nn.Tanh()(n5)
+   -- local ro_real = nn.Tanh()(n6)
+   -- local ro_imag = nn.Tanh()(n7)
+   -- local u_real  = nn.Tanh()(n8)
+   -- local u_imag  = nn.Tanh()(n9)
+   local ri_real, ri_imag = AssociativeLSTM.makeComplexBounded(n4, n5)
+   local ro_real, ro_imag = AssociativeLSTM.makeComplexBounded(n6, n7)
+   local u_real, u_imag   = AssociativeLSTM.makeComplexBounded(n8, n9)
 
    local assoc_arr_real = nn.CMulTable()({gi, u_real})
    local assoc_arr_imag = nn.CMulTable()({gi, u_imag})
@@ -69,11 +93,15 @@ function AssociativeLSTM:buildModel()
       nn.CMulTable()({ro_real, next_c_imag}),
       nn.CMulTable()({ro_imag, next_c_real})
    })
-   local retriv = nn.JoinTable(2)({retriv_real, retriv_imag})
+   -- local retriv = nn.JoinTable(2)({retriv_real, retriv_imag})
+   local retriv_real_bound, retriv_imag_bound = 
+      AssociativeLSTM.makeComplexBounded(retriv_real, retriv_imag)
+
    -- We should average the retrieved values here
 
    local next_h = nn.CMulTable()({
-      nn.Tanh()(retriv),
+      -- nn.Tanh()(retriv),
+      nn.JoinTable(2)({retriv_real_bound, retriv_imag_bound}),
       go
    })
    local outputs = {next_h, next_c}

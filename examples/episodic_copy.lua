@@ -29,6 +29,8 @@ if opt.cuda then
   require 'cunn'
   require 'cutorch'
 end
+
+assert (opt.lstmUnit == 'nn.LSTM' or opt.lstmUnit == 'nn.AssociativeLSTM')
 if opt.lstmUnit == 'nn.LSTM' then
   lstmUnit = nn.LSTM
   opt.lstmOutputSize = opt.hiddenSize

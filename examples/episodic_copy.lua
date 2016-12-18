@@ -31,8 +31,10 @@ if opt.cuda then
 end
 if opt.lstmUnit == 'nn.LSTM' then
   lstmUnit = nn.LSTM
+  opt.lstmOutputSize = opt.hiddenSize
 else
   lstmUnit = nn.AssociativeLSTM
+  opt.lstmOutputSize = opt.hiddenSize * 2
 end
 
 local emptyVal = 1
@@ -60,13 +62,11 @@ function sample_batch(opt)
 end
 
 function reshape(inp_batch, out_batch)
-  local decoder_inp = {}
   local N = inp_batch:size(1)
   -- local T_inp = inp_batch:size(2)
   local T_out = out_batch:size(2)
   local decoder_tgt = torch.Tensor(T_out, N, 1)
   for i=1,T_out do
-    decoder_inp[i] = torch.Tensor(N, 1):zero()
     decoder_tgt[i] = out_batch[{{}, i}]
   end
   return inp_batch:t(), torch.zeros(T_out,N,1), decoder_tgt
@@ -79,11 +79,11 @@ function EncoderDecoder:__init(opt)
   local enc = nn.Sequential()
   self.enc.lstmLayers = {}
   for i=1,opt.numLayers do
-    self.enc.lstmLayers[i] = lstmUnit(opt.hiddenSize, opt.hiddenSize)
+    self.enc.lstmLayers[i] = lstmUnit(opt.lstmOutputSize, opt.hiddenSize)
     enc:add(self.enc.lstmLayers[i])
   end
   if opt.cuda then enc:cuda() end
-  self.enc:add(nn.LookupTable(opt.vocabSize, opt.hiddenSize))
+  self.enc:add(nn.LookupTable(opt.vocabSize, opt.lstmOutputSize))
   -- self.enc:add(nn.PrintSize('BEFORE LSTM'))
   self.enc:add(nn.Sequencer(enc))
   -- self.enc:add(nn.PrintSize('AFTER LSTM'))
@@ -93,13 +93,13 @@ function EncoderDecoder:__init(opt)
     if i== 1 then
       self.dec.lstmLayers[i] = lstmUnit(1, opt.hiddenSize)
     else
-      self.dec.lstmLayers[i] = lstmUnit(opt.hiddenSize, opt.hiddenSize)
+      self.dec.lstmLayers[i] = lstmUnit(opt.lstmOutputSize, opt.hiddenSize)
     end
   end
 
   local dec = nn.Sequential()
   for i=1,opt.numLayers do dec:add(self.dec.lstmLayers[i]) end
-  dec:add(nn.Linear(opt.hiddenSize * 2, opt.vocabSize))
+  dec:add(nn.Linear(opt.lstmOutputSize, opt.vocabSize))
   self.dec:add(nn.Sequencer(dec))
 end
 
@@ -112,6 +112,11 @@ function EncoderDecoder:parameters()
   table.insert(gp, enc_gp)
   table.insert(gp, dec_gp)
   return p, gp
+end
+
+function EncoderDecoder:cuda()
+  self.enc:cuda()
+  self.dec:cuda()
 end
 
 --[[ Forward coupling: Copy encoder cell and output to decoder LSTM ]]--
@@ -133,11 +138,18 @@ end
 
 local model = nn.EncoderDecoder(opt)
 
+local crit = nn.SequencerCriterion(nn.CrossEntropyCriterion())
+
+local gradEncOut = torch.Tensor(opt.inLen, opt.batch_size, opt.lstmOutputSize):zero()
+
+if opt.cuda then
+  model:cuda()
+  crit:cuda()
+  gradEncOut = gradEncOut:cuda()
+end
+
 local w, dw = model:getParameters()
 model.w, model.dw = w, dw
-
-local crit = nn.SequencerCriterion(nn.CrossEntropyCriterion())
-if opt.cuda then crit:cuda() end
 
 local function evaluate()
   for i=1,5 do
@@ -152,7 +164,6 @@ end
 
 local function train()
   print ('Training...')
-  local gradEncOut = torch.Tensor(opt.inLen, opt.batch_size, 2 * opt.hiddenSize):zero()
   for z=1,opt.num_epochs do
     epoch_sum_ce = 0
     epoch_num_correct = 0
@@ -163,6 +174,7 @@ local function train()
       local num_corr = 0
       
       local enc_inp, dec_inp, dec_out = reshape(sample_batch(opt))
+      if opt.cuda then dec_inp = dec_inp:cuda() end
       --print (inp, out)
       model.enc:forward(enc_inp)
       forwardConnect(model.enc, model.dec, opt.nseq + opt.nspaces)
@@ -196,7 +208,7 @@ local function train()
     end
     print ('Epoch '..tostring(z))
     -- print ('Num correct:', epoch_num_correct / steps_per_epoch, ' out of ', batch_size * nseq)
-    print ('Avg CE:', epoch_sum_ce / steps_per_epoch)
+    print ('Avg CE:', epoch_sum_ce / opt.steps_per_epoch)
   end
 end
 

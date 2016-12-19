@@ -45,8 +45,12 @@ function AssociativeLSTM:buildModel()
    -- Calculate gates: input, forget, output (3*outputSize)
    -- Followed by input key, output key, update value (6*outputSize)
    self.i2g = nn.Linear(self.inputSize, 9*self.hiddenSize)(x)
-   self.o2g = nn.LinearNoBias(self.hiddenSize*2, 9*self.hiddenSize)(prev_h)
-
+   -- self.o2g = nn.LinearNoBias(self.hiddenSize*2, 9*self.hiddenSize)(prev_h)
+   self.o2g = nn.JoinTable(2)({
+      nn.LinearNoBias(self.hiddenSize*2, 7*self.hiddenSize)(prev_h),
+      nn.MulConstant(0)(prev_h) -- W_hu = 0
+   })
+   
    local all_input_sums = nn.CAddTable()({self.i2g, self.o2g})
    local reshaped = nn.Reshape(9, self.hiddenSize)(all_input_sums)
 

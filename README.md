@@ -503,8 +503,8 @@ A composition operator is any differentiable operator which takes two vectors of
 The weightings of each operation are computed via a softmax from the current input and previous hidden state, similar to the update gate in the GRU. The produced hidden state is then the element-wise weighted sum of the output of each operation.
 ```lua
 
-p'[t][j] = W[x->pj]x[t] + W[s->pj]s[t−1] + b[1->pj])         (3)
-(p[t][1], ... p[t][J])  = softmax (p'[t][1], ..., p'[t][J])  (4)
+p^[t][j] = W[x->pj]x[t] + W[s->pj]s[t−1] + b[1->pj])         (3)
+(p[t][1], ... p[t][J])  = softmax (p'[t][1], ..., p^[t][J])  (4)
 s[t] = sum(p[t][j] * op[j](s[t-1], v[t]))                    (5)
 ```
 

@@ -14,13 +14,23 @@ local SqrtDiffLayer = nn.Sequential()
                         :add(nn.Sqrt())
                         :add(nn.MulConstant(0.25))
 
+local MaxLayer = nn.Sequential()
+  :add(nn.MapTable(nn.Unsqueeze(1)))
+  :add(nn.JoinTable(1))
+  :add(nn.Max(1))
+
+local MinLayer = nn.Sequential()
+  :add(nn.MapTable(nn.Unsqueeze(1)))
+  :add(nn.JoinTable(1))
+  :add(nn.Min(1))
+
 -- all operations take a table {oldState, newState} and return newState
 _operations = {
-   max = nn.CMaxTable(),
+   max = MaxLayer,
    keep = nn.SelectTable(1),
    replace = nn.SelectTable(2),
    mul = nn.CMulTable(),
-   min = nn.CMinTable(),
+   min = MinLayer,
    diff = nn.CSubTable(),
    forget = nn.Sequential():add(nn.SelectTable(1)):add(nn.MulConstant(0.0)),
    sqrt_diff = SqrtDiffLayer
@@ -28,8 +38,7 @@ _operations = {
 
 function MuFuRu:__init(inputSize, outputSize, ops, rho)
    -- Use all ops by default. To replicate GRU, use keep and replace only.
-   -- Max and Min are temporarily turned off because they're currently incompatible with CUDA
-   self.ops = ops or {'keep', 'replace', 'mul', 'diff', 'forget', 'sqrt_diff'}
+   self.ops = ops or {'keep', 'replace', 'mul', 'diff', 'forget', 'sqrt_diff', 'max', 'min'}
    self.num_ops = #self.ops
    self.operations = {}
    for i=1,self.num_ops do
@@ -82,9 +91,7 @@ function MuFuRu:buildModel()
       -- feature is a Layer taking {oldState, newState, op_weights} to newState
       -- NB: op_weights is an unused argument to feature to avoid the need for an
       -- extra Sequential + Narrow
-      all_ops:add(nn.Sequential()
-         :add(self.operations[i])
-      )
+      all_ops:add(self.operations[i])
    end
 
    local debug = nn.Sequential()

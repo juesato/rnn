@@ -1,3 +1,5 @@
+require 'nn'
+package.path='./?.lua;/var/storage/shared/mscog/t-jouesa/?/init.lua;./?.lua;'..package.path
 require 'paths'
 require 'rnn'
 require 'optim'
@@ -187,7 +189,8 @@ local params, grad_params = lm:getParameters()
 
 local adamconfig = {
    beta1 = opt.adamconfig[1],
-   beta2 = opt.adamconfig[2]
+   beta2 = opt.adamconfig[2],
+   learningRate = opt.startlr
 }
 
 local ntrial = 0
